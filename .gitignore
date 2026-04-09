@@ -1,0 +1,9 @@
+.env
+seen_jobs.json
+job_results_*.xlsx
+applications.json
+__pycache__/
+.venv/
+.vscode/
+.idea/
+.DS_Store
