@@ -39,33 +39,21 @@ MODE = "default"
 
 # ─── SEARCH TERMS BY MODE ────────────────────────────────────────────────────
 _SEARCH_TERMS_DEFAULT = [
-    # 高命中率
-    "Customer Success Manager",
-    "Customer Success Engineer",
+    # Examples — customize these to your target roles
+    "Solutions Engineer",
     "Technical Account Manager",
-    "Solution Consultant",
-    "Fintech Solutions",
-
-    # 目标岗位
-    "Implementation Engineer",
-    "Integration Engineer",
-    "Partner Engineer",
-    "Technical Support Engineer",
+    "Customer Success Manager",
     "Technical Consultant",
+    "Solution Consultant",
 ]
 
 _SEARCH_TERMS_CS = [
-    "Python Developer",
-    "Python Engineer",
-    "Junior Software Engineer",
-    "Junior Backend Developer",
+    # Examples — customize these to your target roles
+    "Software Engineer",
+    "Backend Developer",
     "Data Analyst",
-    "SQL Developer",
-    "SQL Analyst",
-    "Business Intelligence Analyst",
-    "ETL Developer",
-    "Junior Data Engineer",
-    "Automation Engineer Python",
+    "Python Developer",
+    "DevOps Engineer",
 ]
 
 SEARCH_TERMS = _SEARCH_TERMS_CS if MODE == "cs" else _SEARCH_TERMS_DEFAULT
@@ -393,7 +381,7 @@ SCORING RULES (follow strictly):
 - 6-7: Strong match — most criteria met, minor gaps (e.g. adjacent role or industry)
 - 4-5: Partial match — some skills overlap but wrong industry, seniority, or role type
 - 1-3: Poor match — fundamentally different role, industry, or requires skills candidate lacks
-- Jobs requiring 5+ years experience: cap at 5 (candidate has ~1 year post-grad experience)
+- Jobs requiring significantly more experience than the candidate has: cap at 5
 - Jobs in unrelated industries (automotive, aerospace, manufacturing, chemicals): cap at 3
 
 CANDIDATE PROFILE:
