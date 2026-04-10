@@ -80,6 +80,10 @@ The included `CLAUDE.md` instructs Claude Code to:
 
 Just run the collector, then chat with Claude Code about the results.
 
+## Why No Anti-Scraping Code?
+
+This tool uses Selenium with a real Chrome browser and your own LinkedIn credentials — it's essentially automating what you'd do manually. It logs in as you, browses pages at human-like speed, and waits for content to load naturally. LinkedIn's anti-bot measures (CAPTCHAs, email verification) are handled by pausing for manual intervention. This is not a headless scraper hitting public endpoints at scale, so techniques like IP rotation, header spoofing, or rate limit evasion aren't needed or appropriate.
+
 ## Gotchas & Lessons Learned
 
 These are real issues we hit while building and running this tool:
