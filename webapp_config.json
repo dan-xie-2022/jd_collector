@@ -1,0 +1,28 @@
+{
+  "search_terms": [
+    "AI Product Manager",
+    "Product Manager AI",
+    "Senior Product Manager GenAI",
+    "Product Manager LLM",
+    "Product Manager Machine Learning",
+    "AI Product Lead",
+    "AI Innovation Manager",
+    "AI Innovation Lead",
+    "AI Strategy",
+    "GenAI Consultant",
+    "AI Strategist",
+    "AI Strategy Lead",
+    "AI Forward Deployment",
+    "Forward Deployed AI",
+    "AI Implementation Manager",
+    "AI Deployment Specialist"
+  ],
+  "search_location": "London",
+  "date_filter": "Past 24 hours",
+  "max_jobs_per_search": 5,
+  "enable_scoring": true,
+  "mode": "default",
+  "schedule_enabled": true,
+  "schedule_time": "02:00",
+  "resume_summary": "Name: Dan Xie\nCurrent Role: AI Product Manager at Ohme Energy (EV Charging Technology), London, UK — July 2025 to Present\nEducation: PhD in Marketing, HEC Paris (2018–2024, Elyette Roux Prize for Best PhD Thesis); MSc in Economics & Psychology, Panthéon-Sorbonne (2016–2018, International Excellence Scholarship); BSc in Applied Psychology, Shaanxi Normal University (2009–2013, Best of Class Dissertation Award)\nLanguages: English (fluent), Chinese (native), French (conversational)\nTools: Python, SQL, R, Snowflake\nConversational AI skills: Multi-agent architecture, RAG design, LLM orchestration, tool-use agents, human-in-the-loop (HITL), agentic workflow design, context window management\nPrompt Engineering: System prompt design, multi-layer prompt architecture, guardrail calibration\nAI Evaluation: Golden dataset design, LLM-as-judge, RAG retrieval evaluation, regression testing; RAGAS-based eval frameworks; live trace monitoring in Langfuse\nQA: Expertise in QA testing agentic products\nOther PM skills: PRD authoring, agile backlog management, product discovery, metrics framework design, staged rollout, shadow testing, user research, cross-functional stakeholder management\n\nExperience:\n- Ohme Energy, AI Product Manager (Jul 2025–Present, London):\n  • Led end-to-end product ownership of Otis — conversational AI chatbot serving 400K+ users; 40% automated resolution at 10% of the cost of Intercom Fin AI\n  • Product discovery via K-means clustering on 30,000+ customer queries; designed full metrics framework with live observability in Langfuse\n  • Designed human-in-the-loop interrupt handling for multi-step agentic workflows\n  • Shipped CC Copilot (action-taking agent, NPS 10/10) and Troubleshooter Email (30% auto-resolution)\n  • Two ML features: computer vision pipeline (−16.7% onboarding time); LightGBM charger state model (+67% feature adoption, −17% undercharging)\n  • Co-owned company-wide AI agent platform roadmap: MCP server, multi-agent memory, agent front-ends\n  • Reported directly to CEO\n\n- Finres, Product Manager (May 2024–Jun 2025, London/Paris) — VC-backed Climate Fintech:\n  • Launched climate risk scoring features adopted by 2 French financial clients\n  • LLM-powered user segmentation → 30% adoption uplift\n  • Led €1M+ EU consortium (PREVENT) across 20+ partners and 8 countries\n\n- HEC Paris, PhD Researcher in Marketing (Sep 2018–May 2024, Paris):\n  • Quantitative research: causal inference, propensity score matching, diff-in-diff\n  • Data science: cluster analysis, NLP, predictive ML (Python/R) on large datasets\n  • Managed 15,000+ participants; lectured econometrics to Master students\n\nTarget roles: AI Product Manager, Senior Product Manager (AI/GenAI/LLM), Head of AI Product, Product Lead (AI)\nTarget industry: Technology, AI/GenAI, SaaS, FinTech, Climate Tech, Enterprise Software\nPreferred company type: Scale-ups or established tech companies actively building AI/GenAI products\nLocation: London, UK (open to hybrid or remote; not looking to relocate)\nSeniority: Mid-to-senior individual contributor (not seeking director/VP/C-suite)\n"
+}

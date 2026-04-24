@@ -1,74 +1,18 @@
 # LinkedIn Job Collector — Claude Code Workflow
 
-## First-Time Setup (IMPORTANT)
-
-When a user first opens this project, check if setup is complete:
-
-1. Check if `.env` exists — if not, guide setup
-2. Check if `RESUME_SUMMARY` in `collect_jobs.py` still contains "Your Name" — if so, guide setup
-
-### Setup Flow
-
-If setup is needed, walk the user through these steps one by one:
-
-**Step 1 — Environment file**
-
-> "Welcome! Let's set up your job collector. First, I need your LinkedIn credentials. These are stored locally in `.env` and never uploaded anywhere."
-
-Ask for:
-- LinkedIn email
-- LinkedIn password
-- (Optional) HTTP proxy address, if they're in a region where LinkedIn is blocked (e.g., China)
-- (Optional) Anthropic API key, if they want automated scoring
-
-Then create `.env` from `.env.example` with their values.
-
-**Step 2 — Resume**
-
-> "Now tell me about yourself so I can score jobs for you. Answer as much or as little as you want:"
-
-Ask one by one:
-- Name
-- Current role and company
-- Education
-- Languages
-- Key skills
-- Work experience (brief bullet points)
-- Target job titles
-- Target industries
-- Preferred company type
-- Location and work mode preference (remote/hybrid/onsite)
-
-Then update `RESUME_SUMMARY` in `collect_jobs.py` with their answers.
-
-**Step 3 — Search terms**
-
-> "What kind of roles are you looking for? Give me a few job titles and I'll set up the search terms."
-
-Based on their answer, update `_SEARCH_TERMS_DEFAULT` or `_SEARCH_TERMS_CS` in `collect_jobs.py`, and set `MODE` accordingly.
-
-**Step 4 — Location**
-
-> "What city are you targeting? I'll configure the location filter."
-
-Update `SEARCH_LOCATION` in `collect_jobs.py`. If the city is in `GEO_IDS`, it's already supported. If not, look up the LinkedIn geoId and add it.
-
-**Step 5 — Confirm and run**
-
-> "All set! Here's your config: [summary]. Ready to run your first search?"
-
-If yes, run `python3 collect_jobs.py`.
-
----
-
 ## Project Overview
 
-A Selenium-based LinkedIn job scraper. `collect_jobs.py` searches for jobs, fetches JDs, filters by location/industry/title, and outputs Excel files. **Scoring and application tracking are done by Claude Code in conversation — no external API calls needed.**
+A Selenium-based LinkedIn job scraper. `collect_jobs.py` searches for jobs, fetches JDs, filters by location/industry/title, and outputs Excel files. Job scoring uses the DeepSeek API. Application tracking is managed by Claude Code via `applications.json`.
 
 ## Key Files
 
 - `collect_jobs.py` — Main scraper, outputs `job_results_YYYYMMDD_HHMM.xlsx`
 - `backfill_jd.py` — Backfill missing JDs in existing Excel files
+- `score_jobs.py` — Standalone scoring script using DeepSeek API
+- `app.py` — Web application layer
+- `db.py` — SQLite database interface (`jobs.db`)
+- `notifier.py` — Notification module
+- `run_daily.py` — Entry point for scheduled daily runs
 - `applications.json` — Application tracking (maintained by Claude Code)
 - `seen_jobs.json` — Seen job IDs (maintained by script, 30-day expiry)
 - `.env` — Credentials (local only, gitignored)

@@ -6,21 +6,18 @@ LinkedIn Job Collector
 '''
 
 import time
-import csv
 import os
 import re
 import json
 from datetime import datetime
-from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
-import anthropic
+from openai import OpenAI
 import pandas as pd
 from dotenv import load_dotenv
+from utils import create_driver, login, get_job_description
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
@@ -28,9 +25,9 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 LINKEDIN_EMAIL    = os.environ["LINKEDIN_EMAIL"]
 LINKEDIN_PASSWORD = os.environ["LINKEDIN_PASSWORD"]
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
-ENABLE_SCORING = False          # True = use Claude API to score jobs, False = skip scoring (no API cost)
+ENABLE_SCORING = True          # True = use Claude API to score jobs, False = skip scoring (no API cost)
 
 # ─── MODE ────────────────────────────────────────────────────────────────────
 # "default" = Solutions Engineer / TAM / Customer Success 等岗位
@@ -39,12 +36,25 @@ MODE = "default"
 
 # ─── SEARCH TERMS BY MODE ────────────────────────────────────────────────────
 _SEARCH_TERMS_DEFAULT = [
-    # Examples — customize these to your target roles
-    "Solutions Engineer",
-    "Technical Account Manager",
-    "Customer Success Manager",
-    "Technical Consultant",
-    "Solution Consultant",
+    # Product Manager
+    "AI Product Manager",
+    "Product Manager AI",
+    "Senior Product Manager GenAI",
+    "Product Manager LLM",
+    "Product Manager Machine Learning",
+    "AI Product Lead",
+    # Innovation / Strategy
+    "AI Innovation Manager",
+    "AI Innovation Lead",
+    "AI Strategy",
+    "GenAI Consultant",
+    "AI Strategist",
+    "AI Strategy Lead",
+    # Forward Deployment / Implementation
+    "AI Forward Deployment",
+    "Forward Deployed AI",
+    "AI Implementation Manager",
+    "AI Deployment Specialist",
 ]
 
 _SEARCH_TERMS_CS = [
@@ -70,10 +80,13 @@ EXCLUDE_INDUSTRIES = re.compile(
 )
 # Jobs whose title or JD contains these keywords get a relevance boost
 _RELEVANT_KEYWORDS_DEFAULT = re.compile(
-    r'API|integration|SaaS|platform|fintech|payment|checkout|'
-    r'merchant|e-?commerce|cloud|software|digital|tech|IT|'
-    r'implementation|onboarding|customer success|solutions engineer|'
-    r'B2B|enterprise software|CRM|ERP',
+    r'AI product|GenAI|generative AI|LLM|large language model|'
+    r'conversational AI|agentic|RAG|chatbot|NLP|'
+    r'product manager|product lead|product owner|'
+    r'machine learning|ML platform|AI platform|'
+    r'SaaS|B2B|enterprise|scale-up|startup|'
+    r'roadmap|discovery|evaluation|observability|'
+    r'Langfuse|LangChain|OpenAI|Anthropic|Claude|GPT',
     re.IGNORECASE
 )
 _RELEVANT_KEYWORDS_CS = re.compile(
@@ -87,29 +100,72 @@ _RELEVANT_KEYWORDS_CS = re.compile(
 )
 RELEVANT_KEYWORDS = _RELEVANT_KEYWORDS_CS if MODE == "cs" else _RELEVANT_KEYWORDS_DEFAULT
 
-SEARCH_LOCATION = "Shanghai"
+SEARCH_LOCATION = "London"
 DATE_FILTER     = "Past 24 hours"      # "Past 24 hours", "Past week", "Past month"
-MAX_JOBS_PER_SEARCH = 40        # max jobs to collect per search term
+MAX_JOBS_PER_SEARCH = 5        # max jobs to collect per search term
 
 RESUME_SUMMARY = """
-Name: Your Name
-Current Role: Your current job title at Company, Start Date - Present
-Education: Degree, University, Year
-Languages: List your languages
-Skills: List key technical and soft skills
+Name: Dan Xie
+Current Role: AI Product Manager at Ohme Energy (EV Charging Technology), London, UK — July 2025 to Present
+Education: PhD in Marketing, HEC Paris (2018–2024, Elyette Roux Prize for Best PhD Thesis); MSc in Economics & Psychology, Panthéon-Sorbonne (2016–2018, International Excellence Scholarship); BSc in Applied Psychology, Shaanxi Normal University (2009–2013, Best of Class Dissertation Award)
+Languages: English (fluent), Chinese (native), French (conversational)
+Tools: Python, SQL, R, Snowflake
+Conversational AI skills: Multi-agent architecture, RAG design, LLM orchestration, tool-use agents, human-in-the-loop (HITL), agentic workflow design, context window management
+Prompt Engineering: System prompt design, multi-layer prompt architecture, guardrail calibration
+AI Evaluation: Golden dataset design, LLM-as-judge, RAG retrieval evaluation, regression testing; RAGAS-based eval frameworks; live trace monitoring in Langfuse
+QA: Expertise in QA testing agentic products
+Other PM skills: PRD authoring, agile backlog management, product discovery, metrics framework design, staged rollout, shadow testing, user research, cross-functional stakeholder management
+
 Experience:
-- Company A: Brief description of role and achievements
-- Company B: Brief description of role and achievements
-Target roles: List your target job titles
-Target industry: List your target industries
-Preferred company profile: Describe your ideal company type
-Location: Your city, Country (work preferences)
+- Ohme Energy, AI Product Manager (Jul 2025–Present, London):
+  • Led end-to-end product ownership of Otis — conversational AI chatbot serving 400K+ users; 40% automated resolution at 10% of the cost of Intercom Fin AI
+  • Product discovery via K-means clustering on 30,000+ customer queries; designed full metrics framework (conversations, resolutions, escalations, cost per resolution) with live observability in Langfuse
+  • Designed human-in-the-loop interrupt handling for multi-step agentic workflows (escalation trigger logic, state persistence, graceful failure modes)
+  • Shipped CC Copilot (action-taking agent, NPS 10/10 from early adopters) and Troubleshooter Email (30% auto-resolution of inbound support emails)
+  • Owned AI eval strategy: golden datasets from 30K+ real queries, RAGAS-based eval, live Langfuse trace monitoring
+  • Two ML features: computer vision pipeline for EV charger photo classification (−16.7% onboarding time); LightGBM charger state model (+67% feature adoption, −17% undercharging)
+  • Co-owned company-wide AI agent platform roadmap: MCP server, multi-agent memory, agent front-ends
+  • Reported directly to CEO; cross-functional delivery across Engineering, Customer Service, Data Engineering, Product leadership
+
+- Finres, Product Manager (May 2024–Jun 2025, London/Paris) — VC-backed Climate Fintech:
+  • Launched climate risk scoring and visualisation features for portfolio stress testing; adopted by 2 French financial sector clients
+  • Introduced Agile workflows and R&D KPIs; reduced experimentation cycles by 25%
+  • LLM-powered user segmentation → 30% adoption uplift for key product features
+  • Owned delivery in PREVENT — a €1M+ EU consortium across 20+ partners and 8 countries
+
+- HEC Paris, PhD Researcher in Marketing (Sep 2018–May 2024, Paris):
+  • Quantitative research: propensity score matching, instrumental variables, difference-in-differences
+  • Data science: cluster analysis, NLP, predictive ML models (Python/R) on large datasets
+  • Managed 15,000+ participants across survey studies; designed 30+ psychometric scales and experiments
+  • Lectured econometrics and statistics to Master students; improved course evaluation by 15%
+
+- University of Liverpool Management School, Guest Lecturer — AI in Business (Mar 2026)
+- Shaanxi Normal University, Research Manager (2013–2016, Xi'an): built school innovation index for a district of 600K residents
+
+Target roles: AI Product Manager, Senior Product Manager (AI/GenAI/LLM), Head of AI Product, Product Lead (AI)
+Target industry: Technology, AI/GenAI, SaaS, FinTech, Climate Tech, Enterprise Software
+Preferred company type: Scale-ups or established tech companies actively building AI/GenAI products, strong engineering culture
+Location: London, UK (open to hybrid or remote; not looking to relocate)
+Seniority: Mid-to-senior individual contributor (not seeking director/VP/C-suite)
 """
 
+LIST_DIR      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "List")
 OUTPUT_FILE   = f"job_results_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
 SEEN_IDS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seen_jobs.json")
 
 SEEN_EXPIRE_DAYS = 30  # seen jobs older than this are forgotten
+
+# Load overrides from webapp_config.json if it exists (set by the Streamlit web app)
+_WEBAPP_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp_config.json")
+if os.path.exists(_WEBAPP_CONFIG):
+    with open(_WEBAPP_CONFIG, encoding="utf-8") as _f:
+        _wc = json.load(_f)
+    SEARCH_TERMS        = _wc.get("search_terms", SEARCH_TERMS)
+    SEARCH_LOCATION     = _wc.get("search_location", SEARCH_LOCATION)
+    DATE_FILTER         = _wc.get("date_filter", DATE_FILTER)
+    MAX_JOBS_PER_SEARCH = _wc.get("max_jobs_per_search", MAX_JOBS_PER_SEARCH)
+    RESUME_SUMMARY      = _wc.get("resume_summary", RESUME_SUMMARY)
+    ENABLE_SCORING      = _wc.get("enable_scoring", ENABLE_SCORING)
 
 def load_seen_ids():
     if os.path.exists(SEEN_IDS_FILE):
@@ -129,37 +185,6 @@ def save_seen_ids(seen_ids):
     with open(SEEN_IDS_FILE, "w") as f:
         json.dump(seen_ids, f)
 
-# ─── BROWSER SETUP ────────────────────────────────────────────────────────────
-
-def create_driver():
-    # Ensure ChromeDriver's local connections don't go through the proxy
-    os.environ["no_proxy"] = "localhost,127.0.0.1"
-    os.environ["NO_PROXY"] = "localhost,127.0.0.1"
-
-    options = Options()
-    options.add_argument("--start-maximized")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    proxy = os.environ.get("HTTP_PROXY", "")
-    if proxy:
-        options.add_argument(f"--proxy-server={proxy}")  # browser uses proxy to access LinkedIn
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    driver = webdriver.Chrome(options=options)
-    return driver
-
-def login(driver):
-    print("Logging in to LinkedIn...")
-    driver.get("https://www.linkedin.com/login")
-    wait = WebDriverWait(driver, 30)
-    wait.until(EC.presence_of_element_located((By.ID, "username"))).send_keys(LINKEDIN_EMAIL)
-    driver.find_element(By.ID, "password").send_keys(LINKEDIN_PASSWORD)
-    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-    # Wait until login completes (feed page or security check)
-    time.sleep(5)
-    if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
-        print("⚠ LinkedIn security check detected. Please complete it manually in the browser.")
-        input("Press Enter after you've completed the verification...")
-    print("Logged in.")
-
 # ─── JOB SEARCH ───────────────────────────────────────────────────────────────
 
 DATE_MAP = {
@@ -170,10 +195,12 @@ DATE_MAP = {
 
 # LinkedIn geoIds for location filtering
 GEO_IDS = {
-    "China":    "102890883",
-    "Shanghai": "102772228",
-    "Shenzhen": "101591017",
-    "Beijing":  "101780494",
+    "China":          "102890883",
+    "Shanghai":       "102772228",
+    "Shenzhen":       "101591017",
+    "Beijing":        "101780494",
+    "United Kingdom": "101165590",
+    "London":         "90009496",
 }
 
 def build_search_url(search_term, location, date_filter, remote_only=False):
@@ -301,110 +328,81 @@ def get_job_cards(driver, max_jobs):
 
     return jobs
 
-def get_job_description(driver, url):
-    """Fetch JD using the logged-in Selenium browser for full content."""
-    try:
-        driver.get(url)
-
-        # Wait for JD content to appear (up to 10 seconds)
-        jd_selectors = [
-            ".jobs-description__content",
-            ".jobs-description-content__text",
-            ".show-more-less-html__markup",
-            ".jobs-box__html-content",
-            "#job-details",
-            "[class*='jobs-description']",
-        ]
-        combined_css = ", ".join(jd_selectors)
-        try:
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, combined_css))
-            )
-        except TimeoutException:
-            pass  # fall through to fallback
-        time.sleep(1)  # small extra wait for dynamic content
-
-        # Try each selector
-        for sel in jd_selectors:
-            try:
-                el = driver.find_element(By.CSS_SELECTOR, sel)
-                text = el.text.strip()
-                if len(text) > 100:
-                    return text[:3000]
-            except NoSuchElementException:
-                continue
-
-        # Fallback: grab longest text blocks from page source
-        from html.parser import HTMLParser
-
-        class TextExtractor(HTMLParser):
-            def __init__(self):
-                super().__init__()
-                self.texts, self.current, self.skip = [], '', False
-            def handle_starttag(self, tag, attrs):
-                if tag in ('script', 'style', 'nav', 'header', 'footer'):
-                    self.skip = True
-            def handle_endtag(self, tag):
-                if tag in ('script', 'style', 'nav', 'header', 'footer'):
-                    self.skip = False
-                t = self.current.strip()
-                if len(t) > 150:
-                    self.texts.append(t)
-                self.current = ''
-            def handle_data(self, data):
-                if not self.skip:
-                    self.current += data
-
-        parser = TextExtractor()
-        parser.feed(driver.page_source)
-        parser.texts.sort(key=len, reverse=True)
-        parts = [t for t in parser.texts[:4] if len(t) > 150]
-        return "\n\n".join(parts)[:3000] if parts else ""
-    except Exception:
-        return ""
-
-# ─── CLAUDE SCORING ───────────────────────────────────────────────────────────
+# ─── DEEPSEEK SCORING ─────────────────────────────────────────────────────────
 
 _client = None
 
 def _get_client():
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        _client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
     return _client
 
-def score_job(title, company, description):
-    prompt = f"""You are a strict career advisor. Score how well this job matches the candidate.
+_SCORE_SYSTEM = f"""You are a strict career advisor. Score how well a job matches the candidate.
 
 SCORING RULES (follow strictly):
-- 8-10: Perfect match — target role + target industry + right seniority + China location
-- 6-7: Strong match — most criteria met, minor gaps (e.g. adjacent role or industry)
-- 4-5: Partial match — some skills overlap but wrong industry, seniority, or role type
-- 1-3: Poor match — fundamentally different role, industry, or requires skills candidate lacks
-- Jobs requiring significantly more experience than the candidate has: cap at 5
-- Jobs in unrelated industries (automotive, aerospace, manufacturing, chemicals): cap at 3
+- 8–10: Perfect match — AI/GenAI PM role (Product Manager, AI PM, or AI Product Owner) + tech/SaaS/fintech/climate-tech industry + mid-to-senior IC level + London or UK Remote
+- 6–7: Strong match — most criteria met with minor gaps (e.g. "Senior PM" at an AI-adjacent company, hybrid role outside London, or AI PM role in a slightly adjacent industry like insurtech or energy tech)
+- 4–5: Partial match — some overlap but meaningful gaps (e.g. PM role with AI exposure but not AI-first, wrong seniority, or B2B SaaS without AI focus)
+- 1–3: Poor match — fundamentally misaligned (sales, engineering, ops, or non-PM roles) or unrelated industry
+
+Hard caps:
+- Director/VP/C-suite roles: cap at 3
+- Roles requiring no AI/ML experience: cap at 4
+- Roles in unrelated industries (manufacturing, healthcare ops, construction, retail ops): cap at 3
+- Roles outside the UK (unless fully remote and explicitly open to UK): cap at 3
+
+Action thresholds:
+- Below 3 — Flag as poor fit, do not apply
+- 3–6 — Apply with Commercial CV as-is, no tailoring needed
+- Above 6 — Provide full tailoring suggestions
 
 CANDIDATE PROFILE:
 {RESUME_SUMMARY}
 
-JOB:
-Title: {title}
-Company: {company}
-Description (excerpt):
-{description[:2000]}
-
 Respond in this exact format (nothing else):
 SCORE: <1-10>
 REASON: <one sentence why>
-MATCH_TAGS: <comma-separated keywords that match, e.g. "bilingual, SaaS, technical support">
-"""
+MATCH_TAGS: <comma-separated keywords that match, e.g. "bilingual, SaaS, technical support">"""
+
+
+def _build_negative_examples_str() -> str:
+    """Load 'not interested' jobs from DB and format as prompt negative examples."""
     try:
-        msg = _get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
+        import db as _db
+        examples = _db.get_negative_examples(limit=15)
+        if not examples:
+            return ""
+        lines = [
+            f'  - "{e["title"]}" @ {e["company"]}'
+            + (f': {e["score_reason"]}' if e.get("score_reason") else "")
+            for e in examples
+        ]
+        return (
+            "\n\nNEGATIVE EXAMPLES — the candidate marked these as NOT INTERESTED "
+            "(score similar jobs LOWER, apply same reasoning to penalise alike roles):\n"
+            + "\n".join(lines)
         )
-        text = msg.content[0].text.strip()
+    except Exception:
+        return ""
+
+
+def score_job(title, company, description):
+    try:
+        neg_str = _build_negative_examples_str()
+        msg = _get_client().chat.completions.create(
+            model="deepseek-chat",
+            max_tokens=200,
+            messages=[
+                {"role": "system", "content": _SCORE_SYSTEM},
+                {"role": "user", "content": (
+                    f"JOB:\nTitle: {title}\nCompany: {company}\n"
+                    f"Description (excerpt):\n{description[:8000]}"
+                    f"{neg_str}"
+                )},
+            ],
+        )
+        text = msg.choices[0].message.content.strip()
         score_match = re.search(r"SCORE:\s*(\d+)", text)
         reason_match = re.search(r"REASON:\s*(.+)", text)
         tags_match = re.search(r"MATCH_TAGS:\s*(.+)", text)
@@ -413,23 +411,29 @@ MATCH_TAGS: <comma-separated keywords that match, e.g. "bilingual, SaaS, technic
         tags   = tags_match.group(1).strip() if tags_match else ""
         return score, reason, tags
     except Exception as e:
-        print(f"  Claude error: {e}")
+        print(f"  DeepSeek error: {e}")
         return 5, "Could not score", ""
 
 # ─── PRE-FILTER ───────────────────────────────────────────────────────────────
 
 # Keywords that indicate a job is NOT a good match (case-insensitive)
 _TITLE_SKIP_DEFAULT = [
-    "machine learning", "blockchain", "cloud engineer", "software engineer",
+    # Pure engineering — not PM roles
+    "software engineer", "backend engineer", "frontend engineer",
     "fullstack", "full stack", "full-stack", "ml engineer", "data engineer",
-    "hardware", "clinical trial", "medical solution", "FAE", "intern",
-    "analyst intern", "sales manager", "security sales", "ecommerce",
+    "cloud engineer", "devops", "platform engineer", "infrastructure",
+    "hardware", "firmware", "embedded",
+    # Sales / commercial
+    "sales manager", "account executive", "account manager", "business development",
+    "pre-sales", "solutions engineer", "customer success",
+    # Too junior
+    "intern", "graduate scheme", "apprentice",
+    # Too senior
+    "chief product officer", "CPO", "vice president", "VP of product",
+    "C-suite", "CTO", "CEO",
+    # Unrelated fields
+    "clinical trial", "medical", "FAE", "hardware sales",
     "焊接", "模拟IC", "功率器件", "设计院", "汽车零部件",
-    "director", "senior director", "vice president", "VP ", "head of",
-    "principal", "staff engineer", "lead architect",
-    # 纯客服岗
-    "客服", "customer service", "call center", "电话客服", "在线客服",
-    "客服专员", "客服前台", "淘宝客服", "天猫客服", "电商客服",
 ]
 _TITLE_SKIP_CS = [
     "hardware", "clinical trial", "medical solution", "FAE",
@@ -449,43 +453,40 @@ TITLE_SKIP_KEYWORDS = _TITLE_SKIP_CS if MODE == "cs" else _TITLE_SKIP_DEFAULT
 def has_chinese(text):
     return bool(re.search(r'[\u4e00-\u9fff]', text))
 
-_NON_CHINA_LOCATIONS = re.compile(
-    r'United States|USA|\bUS\b|Remote\)$|Canada|United Kingdom|UK\b|'
-    r'India|Germany|France|Australia|Japan|Singapore|Brazil|'
-    r'NAMER|EMEA|APAC(?!.*China)|'
-    r'\b[A-Z]{2},\s*United|\bNY\b|\bCA\b|\bTX\b|\bWA\b|\bMA\b|\bIL\b|'
+_NON_UK_LOCATIONS = re.compile(
+    r'United States|USA|\bUS\b|Canada|'
+    r'China|Shanghai|Beijing|Shenzhen|'
+    r'India|Bangalore|Hyderabad|Mumbai|'
+    r'Germany|France|Netherlands|Spain|Italy|Poland|'
+    r'Australia|Japan|Singapore|Brazil|'
+    r'\bNY\b|\bCA\b|\bTX\b|\bWA\b|\bMA\b|\bIL\b|'
     r'New York|San Francisco|Los Angeles|Seattle|Boston|Chicago|Austin|'
-    r'London|Berlin|Tokyo|Bangalore|Hyderabad|Toronto|Vancouver',
+    r'Berlin|Paris|Amsterdam|Madrid|Warsaw|Tokyo|Toronto|Vancouver|Sydney',
     re.IGNORECASE
 )
 
 def is_acceptable_location(location):
     """
-    Keep: Shanghai jobs, China Remote jobs, unknown location.
-    Skip: non-China jobs, and non-Shanghai onsite/hybrid in China.
+    Keep: London jobs, UK Remote jobs, unknown location.
+    Skip: non-UK jobs, and non-London onsite/hybrid in UK.
     """
     if not location:
         return True  # unknown, keep
     loc = location.strip()
-    is_china = bool(re.search(
-        r'China|中国|Shanghai|上海|Beijing|北京|Shenzhen|深圳|Guangzhou|广州|'
-        r'Hangzhou|杭州|Chengdu|成都|Nanjing|南京|Suzhou|苏州|Wuhan|武汉|'
-        r'Xi.an|西安|Dongguan|东莞',
-        loc, re.IGNORECASE
-    ))
+    is_uk = bool(re.search(r'United Kingdom|UK\b|\bEngland\b|London|Manchester|Edinburgh|Birmingham', loc, re.IGNORECASE))
     is_remote = bool(re.search(r'Remote', loc, re.IGNORECASE))
-    is_shanghai = bool(re.search(r'Shanghai|上海', loc, re.IGNORECASE))
-    # Non-China → skip
-    if not is_china and _NON_CHINA_LOCATIONS.search(loc):
+    is_london = bool(re.search(r'London', loc, re.IGNORECASE))
+    # Clearly non-UK → skip
+    if not is_uk and _NON_UK_LOCATIONS.search(loc):
         return False
-    # China Remote → keep
-    if is_china and is_remote:
+    # UK Remote → keep
+    if is_uk and is_remote:
         return True
-    # Shanghai (any work mode) → keep
-    if is_shanghai:
+    # London (any work mode) → keep
+    if is_london:
         return True
-    # Other Chinese cities, not remote → skip
-    if is_china and not is_remote:
+    # Other UK cities, not remote → skip
+    if is_uk and not is_remote:
         return False
     return True  # ambiguous, keep
 
@@ -523,12 +524,12 @@ def main():
     print(f"Already seen: {len(seen_ids)} jobs (will skip)")
 
     try:
-        login(driver)
+        login(driver, LINKEDIN_EMAIL, LINKEDIN_PASSWORD)
 
-        # Two search rounds: Shanghai (all) + China (remote only)
+        # Two search rounds: London (all) + UK (remote only)
         search_rounds = [
-            (SEARCH_LOCATION, False, "Shanghai"),
-            ("China",         True,  "China Remote"),
+            (SEARCH_LOCATION,  False, "London"),
+            ("United Kingdom", True,  "UK Remote"),
         ]
 
         for round_location, round_remote, round_label in search_rounds:
@@ -599,7 +600,8 @@ def main():
         print(f"\n{'='*60}")
         print(f"Total unique jobs collected: {len(unique_jobs)}")
 
-        output_path = os.path.join(os.path.dirname(__file__), OUTPUT_FILE)
+        os.makedirs(LIST_DIR, exist_ok=True)
+        output_path = os.path.join(LIST_DIR, OUTPUT_FILE)
 
         if ENABLE_SCORING:
             print("Scoring with Claude...")
@@ -677,6 +679,14 @@ def main():
                         cell.fill = fill
 
         save_seen_ids(seen_ids)
+
+        # Write to SQLite
+        try:
+            import db as _db
+            _db.upsert_jobs(unique_jobs)
+            print(f"   SQLite updated ({len(unique_jobs)} jobs)")
+        except Exception as _e:
+            print(f"   SQLite write failed: {_e}")
 
         print(f"\n✅ Done! Results saved to: {output_path}")
         print(f"   {len(unique_jobs)} new jobs collected")

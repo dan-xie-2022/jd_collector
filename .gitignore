@@ -1,9 +1,23 @@
+# Credentials — never commit
 .env
-seen_jobs.json
-job_results_*.xlsx
-applications.json
+
+# Personal files
+CV.pdf
+
+# Database
+*.db
+
+# Python
 __pycache__/
+*.pyc
+*.pyo
 .venv/
-.vscode/
-.idea/
+venv/
+
+# macOS
 .DS_Store
+
+# Output files (large, generated)
+job_results_*.xlsx
+seen_jobs.json
+applications.json
