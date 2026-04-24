@@ -1,6 +1,6 @@
 # LinkedIn Job Collector
 
-A Selenium-based LinkedIn job scraper designed to work with [Claude Code](https://claude.ai/claude-code) for AI-powered job analysis and application tracking.
+A Selenium-based LinkedIn job scraper with a Streamlit web UI, DeepSeek-powered job scoring, SQLite tracking, and daily email notifications. Designed to work with [Claude Code](https://claude.ai/claude-code) for AI-assisted application management.
 
 ## What It Does
 
@@ -8,7 +8,10 @@ A Selenium-based LinkedIn job scraper designed to work with [Claude Code](https:
 - Fetches full job descriptions via logged-in Selenium browser
 - Filters by location, industry, and title keywords
 - Deduplicates results (by job ID and title+company)
+- Scores each job 1–10 using DeepSeek API against your resume
 - Outputs sorted Excel spreadsheets with color coding
+- Stores all jobs and application status in SQLite (`jobs.db`)
+- Sends email digest of high-scoring jobs after each run
 - Tracks seen jobs with 30-day expiry to avoid re-processing
 
 ## Features
@@ -19,7 +22,22 @@ A Selenium-based LinkedIn job scraper designed to work with [Claude Code](https:
 - **Industry/title pre-filters**: Auto-skip irrelevant roles
 - **Two search modes**: `default` (customer-facing roles) and `cs` (developer roles)
 - **Incremental Excel saves**: No data loss if interrupted during scoring
-- **Claude Code integration**: CLAUDE.md defines a complete AI-assisted workflow for scoring, analyzing, and tracking job applications
+- **Streamlit web UI**: Browse jobs, manage applications, configure searches (`app.py`)
+- **Scheduled daily runs**: `run_daily.py` invoked by launchd/cron, with email notification
+- **Claude Code integration**: `CLAUDE.md` defines a complete AI-assisted workflow for scoring, analyzing, and tracking applications
+
+## Project Structure
+
+```
+collect_jobs.py     # Main scraper → outputs Excel + scores jobs
+backfill_jd.py      # Backfill missing JDs in existing Excel files
+score_jobs.py       # Standalone scoring script (DeepSeek API)
+app.py              # Streamlit web app
+db.py               # SQLite interface (jobs.db)
+notifier.py         # Email digest after each run
+run_daily.py        # Entry point for scheduled daily runs
+webapp_config.json  # Search config + resume (editable via UI)
+```
 
 ## Setup
 
@@ -28,28 +46,32 @@ A Selenium-based LinkedIn job scraper designed to work with [Claude Code](https:
 - Python 3.10+
 - Chrome + ChromeDriver
 - A LinkedIn account
+- DeepSeek API key ([platform.deepseek.com](https://platform.deepseek.com))
+- Gmail App Password (for email notifications)
 
 ### Install
 
 ```bash
-pip install selenium pandas openpyxl python-dotenv anthropic
+pip install selenium pandas openpyxl python-dotenv openai streamlit
 ```
 
 ### Configure
 
 ```bash
 cp .env.example .env
-# Edit .env with your LinkedIn credentials
+# Fill in your credentials
 ```
 
 Edit `collect_jobs.py` to customize:
 - `MODE` — `"default"` or `"cs"`
 - `SEARCH_TERMS` — Keywords to search
-- `RESUME_SUMMARY` — Your resume (used for API scoring if enabled)
+- `RESUME_SUMMARY` — Your resume (used for DeepSeek scoring)
 - `SEARCH_LOCATION` — Target city
 - `DATE_FILTER` — `"Past 24 hours"`, `"Past week"`, or `"Past month"`
 - `MAX_JOBS_PER_SEARCH` — Max results per search term
-- `ENABLE_SCORING` — `True` to use Claude API for scoring, `False` to skip
+- `ENABLE_SCORING` — `True` to score via DeepSeek, `False` to skip
+
+Or configure everything visually via the Streamlit app (see below).
 
 If you're in a region where LinkedIn is blocked, set `HTTP_PROXY` in `.env`.
 
@@ -67,6 +89,29 @@ python collect_jobs.py
 python backfill_jd.py                    # uses most recent Excel
 python backfill_jd.py job_results.xlsx   # specify a file
 ```
+
+### Score jobs manually
+
+```bash
+python score_jobs.py                     # scores most recent Excel
+python score_jobs.py job_results.xlsx    # specify a file
+```
+
+### Web UI
+
+```bash
+streamlit run app.py
+```
+
+Browse collected jobs, track application status, and update search settings from the browser.
+
+### Scheduled daily runs
+
+```bash
+python run_daily.py
+```
+
+Runs the collector, then sends an email digest of high-scoring new jobs. Wire this to launchd (macOS) or cron to run automatically each morning.
 
 ### With Claude Code
 
